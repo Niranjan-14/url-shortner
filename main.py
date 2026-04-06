@@ -2,6 +2,7 @@ from fastapi import FastAPI
 import psycopg2
 import random
 import string
+from fastapi.responses import RedirectResponse
 
 app = FastAPI()
 
@@ -39,13 +40,41 @@ def shorten(long_url: str):
     conn.commit()
     return {"short_url": code}
 
+@app.get("/stats")
+def get_stats():
+    conn.rollback()
+    cursor.execute(
+        "SELECT COUNT(*), SUM(click_count), MAX(created_at) FROM urls"
+    )
+    result = cursor.fetchone()
+    cursor.execute("SELECT short_code, long_url, click_count FROM urls "
+                   "ORDER BY click_count DESC "
+                   "LIMIT 1")
+    output = cursor.fetchone()
+    if output is None:
+        return {"error" : "URL output is None"}
+
+    return {"total_count": result[0] , "total_clicks": result[1], "latest_created_time":result[2], 
+            "Most_accessed_short_url":output[0], "Most_accessed_long_url":output[1], "total_url_clicks":output[2]}
+
 @app.get("/{code}")
 def redirect(code: str):
     cursor.execute(
         "SELECT long_url FROM urls WHERE short_code = %s",
         (code,)
     )
+
     result = cursor.fetchone()
+
+    cursor.execute(
+	"UPDATE urls SET click_count = click_count + 1 WHERE short_code = %s",
+	(code,)
+    )
+
+    conn.commit()
+
     if result is None:
         return {"error": "URL not found"}
-    return {"url": result[0]}
+    return RedirectResponse(url=result[0])
+
+
