@@ -26,6 +26,10 @@ cursor.execute("""
     )
 """)
 conn.commit()
+cursor.execute("""
+    CREATE INDEX IF NOT EXISTS idx_short_code ON urls (short_code)
+""")
+conn.commit()
 
 def generate_code():
     return ''.join(random.choices(string.ascii_lowercase, k=6))
