@@ -3,7 +3,9 @@ import psycopg2
 import random
 import string
 from fastapi.responses import RedirectResponse
+import redis
 
+r = redis.Redis(host='localhost', port=6379, db=0)
 app = FastAPI()
 
 # Database connection
@@ -63,6 +65,12 @@ def get_stats():
 
 @app.get("/{code}")
 def redirect(code: str):
+    @app.get("/{code}")
+    def redirect(code: str):
+        cached = r.get(code)
+        if cached:
+            return RedirectResponse(url=cached.decode('utf-8'))
+
     cursor.execute(
         "SELECT long_url FROM urls WHERE short_code = %s",
         (code,)
@@ -79,6 +87,7 @@ def redirect(code: str):
 
     if result is None:
         return {"error": "URL not found"}
+    r.set(code, result[0])
     return RedirectResponse(url=result[0])
 
 
